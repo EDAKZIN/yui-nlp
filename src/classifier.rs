@@ -48,11 +48,18 @@ pub struct ClassifyResult {
 // ---------------------------------------------------------------------------
 
 /// Keywords de apertura de aplicaciones (yui_assistant.py L337-340).
-/// Solo verbos imperativos directos, conjugaciones de comando.
+/// Incluye: imperativo, subjuntivo, infinitivo y formas pronominales.
 const OPEN_KEYWORDS: &[&str] = &[
-    "abre ", "abrir ", "abri ", "abreme ", "abrirme ",
-    "ejecuta ", "ejecutar ",
-    "inicia ", "iniciar ",
+    // Imperativo directo
+    "abre ", "abreme ", "abrelo ", "abrela ",
+    // Infinitivo y subjuntivo (estructuras indirectas: "necesito que abras X")
+    "abrir ", "abras ", "abrirme ",
+    // Pasado inmediato como orden informal ("abri chrome" = "abrí chrome")
+    "abri ",
+    // Ejecutar
+    "ejecuta ", "ejecutar ", "ejecutes ",
+    // Iniciar
+    "inicia ", "iniciar ", "inicies ",
 ];
 
 /// Keywords ambiguas de apertura.
@@ -63,11 +70,16 @@ const OPEN_KEYWORDS_AMBIGUOUS: &[&str] = &[
 ];
 
 /// Keywords de busqueda web (yui_assistant.py L370-377).
-/// Verbos imperativos directos que indican intencion de buscar informacion.
+/// Incluye imperativos, subjuntivos e infinitivos.
 const SEARCH_KEYWORDS: &[&str] = &[
-    "busca ", "buscas ", "buscar ", "busques ", "buscame ",
-    "investiga ", "investigues ",
-    "dime sobre ", "hablame de ", "cuentame sobre ", "informacion sobre ",
+    // Buscar: imperativo, subjuntivo, infinitivo
+    "busca ", "buscas ", "buscar ", "busques ", "buscame ", "buscalo ",
+    // Investigar
+    "investiga ", "investigar ", "investigues ",
+    // Frases completas de solicitud de informacion
+    "dime sobre ", "hablame de ", "hablame sobre ",
+    "cuentame sobre ", "cuentame de ",
+    "informacion sobre ", "informacion de ",
 ];
 
 /// Keywords de busqueda tipo pregunta (requieren validacion extra).
@@ -75,6 +87,7 @@ const SEARCH_KEYWORDS: &[&str] = &[
 const SEARCH_QUESTION_KEYWORDS: &[&str] = &[
     "que es ", "que son ", "que significa ",
     "quien es ", "quien fue ", "quien era ",
+    "que paso con ", "que ocurrio con ",
 ];
 
 /// Keywords de recordatorios (reminders.py L132-139).
@@ -607,5 +620,63 @@ mod tests {
         let c = classifier();
         let r = c.classify("estoy un poco cansado hoy pero bien");
         assert!(!r.is_command);
+    }
+
+    // === Conjugaciones indirectas (deben pasar como comando) ===
+
+    #[test]
+    fn test_cmd_necesito_que_abras() {
+        let c = classifier();
+        let r = c.classify("yui, necesito que abras translator++");
+        assert!(r.is_command, "'necesito que abras' es comando indirecto");
+        assert_eq!(r.category.unwrap(), Category::OpenApp);
+    }
+
+    #[test]
+    fn test_cmd_puedes_abrir() {
+        let c = classifier();
+        let r = c.classify("puedes abrir chrome por favor");
+        assert!(r.is_command, "'puedes abrir' es solicitud de apertura");
+        assert_eq!(r.category.unwrap(), Category::OpenApp);
+    }
+
+    #[test]
+    fn test_cmd_ejecutes() {
+        let c = classifier();
+        let r = c.classify("necesito que ejecutes el programa");
+        assert!(r.is_command, "'ejecutes' subjuntivo es comando");
+        assert_eq!(r.category.unwrap(), Category::OpenApp);
+    }
+
+    #[test]
+    fn test_cmd_abrelo() {
+        let c = classifier();
+        let r = c.classify("abrelo ya");
+        assert!(r.is_command, "'abrelo' pronominal es comando");
+        assert_eq!(r.category.unwrap(), Category::OpenApp);
+    }
+
+    #[test]
+    fn test_cmd_buscalo() {
+        let c = classifier();
+        let r = c.classify("buscalo en internet");
+        assert!(r.is_command, "'buscalo' pronominal es comando");
+        assert_eq!(r.category.unwrap(), Category::WebSearch);
+    }
+
+    #[test]
+    fn test_cmd_hablame_sobre() {
+        let c = classifier();
+        let r = c.classify("hablame sobre la inteligencia artificial");
+        assert!(r.is_command, "'hablame sobre' es solicitud de info");
+        assert_eq!(r.category.unwrap(), Category::WebSearch);
+    }
+
+    #[test]
+    fn test_cmd_que_paso_con() {
+        let c = classifier();
+        let r = c.classify("que paso con el terremoto de ayer");
+        assert!(r.is_command, "'que paso con' es pregunta factual");
+        assert_eq!(r.category.unwrap(), Category::WebSearch);
     }
 }
